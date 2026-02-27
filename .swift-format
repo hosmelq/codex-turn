@@ -1,0 +1,11 @@
+{
+  "indentation": {
+    "spaces": 4
+  },
+  "lineBreakBeforeControlFlowKeywords": false,
+  "lineLength": 120,
+  "maximumBlankLines": 1,
+  "respectsExistingLineBreaks": true,
+  "tabWidth": 4,
+  "version": 1
+}

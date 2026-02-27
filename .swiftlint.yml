@@ -1,0 +1,69 @@
+analyzer_rules:
+  - unused_declaration
+  - unused_import
+
+cyclomatic_complexity:
+  error: 25
+  warning: 15
+
+excluded:
+  - .build
+  - .swiftpm
+  - DerivedData
+
+force_cast: warning
+force_try: warning
+
+function_body_length:
+  error: 140
+  warning: 100
+
+identifier_name:
+  excluded:
+    - id
+    - x
+    - y
+  min_length:
+    warning: 2
+
+included:
+  - Sources
+  - Tests
+
+line_length:
+  error: 140
+  ignores_comments: true
+  ignores_urls: true
+  warning: 120
+
+opening_brace:
+  ignore_multiline_function_signatures: true
+  ignore_multiline_statement_conditions: true
+  ignore_multiline_type_headers: false
+  severity: warning
+
+opt_in_rules:
+  - closure_spacing
+  - empty_count
+  - empty_string
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - last_where
+  - operator_usage_whitespace
+  - sorted_imports
+
+reporter: xcode
+
+trailing_comma:
+  mandatory_comma: true
+
+type_body_length:
+  error: 450
+  warning: 300
+
+type_name:
+  max_length:
+    warning: 50
+    error: 60
+  min_length: 3

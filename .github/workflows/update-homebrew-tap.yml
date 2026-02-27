@@ -1,0 +1,172 @@
+name: Update Homebrew tap
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-homebrew-tap-${{ inputs.release_tag }}
+  cancel-in-progress: true
+
+jobs:
+  update-homebrew-cask:
+    env:
+      APP_BUNDLE: CodexTurn.app
+      ASSET_BASENAME: CodexTurn
+      CASK_DESC: Menu bar app that tracks Codex sessions and your turn to reply
+      CASK_NAME: CodexTurn
+      CASK_TOKEN: codexturn
+      TAP_CASK_PATH: Casks/codexturn.rb
+      TAP_REPOSITORY: hosmelq/homebrew-tap
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Resolve release metadata
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ inputs.release_tag }}"
+          version="${tag#v}"
+          asset_name="${ASSET_BASENAME}-${version}.dmg"
+
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}")"
+
+          asset_api_url="$(
+            jq -r \
+              --arg name "$asset_name" \
+              '.assets[] | select(.name == $name) | .url' \
+              <<< "$release_json"
+          )"
+
+          if [[ -z "$asset_api_url" || "$asset_api_url" == "null" ]]; then
+            echo "Could not find release asset: $asset_name" >&2
+            echo "Available assets:" >&2
+            jq -r '.assets[].name' <<< "$release_json" >&2 || true
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
+          echo "asset_api_url=$asset_api_url" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          path: tap
+          repository: ${{ env.TAP_REPOSITORY }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Download release DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh api \
+            -H "Accept: application/octet-stream" \
+            "${{ steps.release.outputs.asset_api_url }}" > "${{ steps.release.outputs.asset_name }}"
+
+      - name: Compute SHA256
+        id: digest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sha="$(sha256sum "${{ steps.release.outputs.asset_name }}" | awk '{print $1}')"
+          echo "value=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Update cask file
+        env:
+          RELEASE_SHA256: ${{ steps.digest.outputs.value }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cask_file="tap/${TAP_CASK_PATH}"
+
+          ruby - "$cask_file" <<'RUBY'
+          require "fileutils"
+
+          path = ARGV.fetch(0)
+
+          asset_basename = ENV.fetch("ASSET_BASENAME")
+          app_bundle = ENV.fetch("APP_BUNDLE")
+          cask_desc = ENV.fetch("CASK_DESC")
+          cask_name = ENV.fetch("CASK_NAME")
+          cask_token = ENV.fetch("CASK_TOKEN")
+          github_repository = ENV.fetch("GITHUB_REPOSITORY")
+          release_sha = ENV.fetch("RELEASE_SHA256")
+          release_version = ENV.fetch("RELEASE_VERSION")
+
+          if File.exist?(path)
+            content = File.read(path)
+            updated = content.dup
+
+            updated.sub!(/sha256 "[^"]+"/, %(sha256 "#{release_sha}")) ||
+              abort("sha256 line not found in #{path}")
+
+            updated.sub!(/version "[^"]+"/, %(version "#{release_version}")) ||
+              abort("version line not found in #{path}")
+
+            File.write(path, updated)
+            puts "Updated existing cask: #{path}"
+            exit 0
+          end
+
+          FileUtils.mkdir_p(File.dirname(path))
+
+          homepage = "https://github.com/#{github_repository}"
+          url = "#{homepage}/releases/download/v\#{version}/#{asset_basename}-\#{version}.dmg"
+
+          content = <<~CASK
+            cask "#{cask_token}" do
+              version "#{release_version}"
+              sha256 "#{release_sha}"
+
+              url "#{url}"
+              name "#{cask_name}"
+              desc "#{cask_desc}"
+              homepage "#{homepage}"
+
+              app "#{app_bundle}"
+            end
+          CASK
+
+          File.write(path, content)
+          puts "Created new cask: #{path}"
+          RUBY
+
+      - name: Commit and push tap update
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        working-directory: tap
+        run: |
+          set -euo pipefail
+
+          git add "${TAP_CASK_PATH}"
+
+          if git diff --cached --quiet -- "${TAP_CASK_PATH}"; then
+            echo "No cask changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit -m "${CASK_TOKEN} ${RELEASE_TAG}"
+          git push

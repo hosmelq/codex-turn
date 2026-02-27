@@ -1,0 +1,11 @@
+.DS_Store
+*.profdata
+*.profraw
+*.xcuserstate
+.build/
+.swiftpm/
+.xcode-build/
+DerivedData/
+Package.resolved
+dist
+info

@@ -1,0 +1,250 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: Continuous integration
+
+    uses: ./.github/workflows/ci.yml
+
+    secrets: inherit
+
+  release:
+    needs: ci
+
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Sparkle feed URL
+        id: sparkle-feed
+        shell: bash
+        env:
+          SPARKLE_FEED_URL: ${{ vars.SPARKLE_FEED_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SPARKLE_FEED_URL}" ]]; then
+            feed_url="${SPARKLE_FEED_URL}"
+          else
+            feed_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/appcast.xml"
+          fi
+
+          echo "value=${feed_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Sparkle release keys
+        shell: bash
+        env:
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPARKLE_PUBLIC_ED_KEY}" ]]; then
+            echo "Missing required secret: SPARKLE_PUBLIC_ED_KEY"
+            exit 1
+          fi
+          if [[ -z "${SPARKLE_PRIVATE_ED_KEY}" ]]; then
+            echo "Missing required secret: SPARKLE_PRIVATE_ED_KEY"
+            exit 1
+          fi
+
+      - name: Import Developer ID certificate
+        shell: bash
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cert_path="$RUNNER_TEMP/codesign.p12"
+          keychain_path="$RUNNER_TEMP/build.keychain-db"
+
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > "$cert_path"
+
+          security create-keychain -p "" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "" "$keychain_path"
+          security import "$cert_path" -k "$keychain_path" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12
+          security list-keychains -d user -s "$keychain_path" login.keychain-db
+          security default-keychain -d user -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$keychain_path"
+
+      - name: Write App Store Connect key
+        shell: bash
+        env:
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_P8: ${{ secrets.APPLE_NOTARY_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          notary_key_path="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          printf '%s' "$APPLE_NOTARY_KEY_P8" > "$notary_key_path"
+          chmod 600 "$notary_key_path"
+          echo "APPLE_NOTARY_KEY_PATH=$notary_key_path" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize
+        shell: bash
+        env:
+          APPLE_CODESIGN_IDENTITY: ${{ secrets.APPLE_CODESIGN_IDENTITY }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_BUILD: ${{ github.run_number }}
+          RELEASE_NOTARIZE: "1"
+          RELEASE_NOTARIZE_DMG: "1"
+          RELEASE_NOTARIZE_ZIP: "1"
+          RELEASE_SPARKLE_FEED_URL: ${{ steps.sparkle-feed.outputs.value }}
+          RELEASE_SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: ./scripts/release-build.sh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/CodexTurn-${{ steps.version.outputs.value }}.dmg
+            dist/CodexTurn-${{ steps.version.outputs.value }}.zip
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+
+  publish-appcast:
+    needs: release
+
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate Sparkle appcast key
+        shell: bash
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPARKLE_PRIVATE_ED_KEY}" ]]; then
+            echo "Missing required secret: SPARKLE_PRIVATE_ED_KEY"
+            exit 1
+          fi
+
+      - name: Resolve appcast workspace
+        id: appcast
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace_path="${RUNNER_TEMP}/appcast-workspace"
+
+          mkdir -p "${workspace_path}"
+
+          echo "workspace=${workspace_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release ZIP
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          asset_name="CodexTurn-${version}.zip"
+
+          gh release download "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${asset_name}" \
+            --dir "${{ steps.appcast.outputs.workspace }}"
+
+      - name: Restore existing appcast
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "appcast.xml" ]]; then
+            cp "appcast.xml" "${{ steps.appcast.outputs.workspace }}/appcast.xml"
+          fi
+
+      - name: Build Sparkle generate_appcast tool
+        id: generate-appcast-tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift package resolve
+
+          derived_data_path="${RUNNER_TEMP}/sparkle-tools"
+          xcodebuild \
+            -project ".build/checkouts/Sparkle/Sparkle.xcodeproj" \
+            -scheme generate_appcast \
+            -configuration Release \
+            -derivedDataPath "${derived_data_path}" \
+            build
+
+          generate_appcast_path="${derived_data_path}/Build/Products/Release/generate_appcast"
+          if [[ ! -x "${generate_appcast_path}" ]]; then
+            echo "generate_appcast binary not found at ${generate_appcast_path}"
+            exit 1
+          fi
+
+          echo "path=${generate_appcast_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate appcast.xml
+        shell: bash
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+
+          printf '%s' "${SPARKLE_PRIVATE_ED_KEY}" | "${{ steps.generate-appcast-tool.outputs.path }}" \
+            --ed-key-file - \
+            --maximum-versions 0 \
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}" \
+            -o "${{ steps.appcast.outputs.workspace }}/appcast.xml" \
+            "${{ steps.appcast.outputs.workspace }}"
+
+      - name: Publish appcast to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          cp "${{ steps.appcast.outputs.workspace }}/appcast.xml" ./appcast.xml
+          git add appcast.xml
+
+          if git diff --cached --quiet -- appcast.xml; then
+            echo "No appcast changes detected."
+            exit 0
+          fi
+
+          git commit -m "Update appcast for ${GITHUB_REF_NAME}"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+  update-homebrew-tap:
+    needs:
+      - release
+      - publish-appcast
+
+    secrets: inherit
+
+    uses: ./.github/workflows/update-homebrew-tap.yml
+
+    with:
+      release_tag: ${{ github.ref_name }}

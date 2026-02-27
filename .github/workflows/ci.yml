@@ -1,0 +1,40 @@
+name: Continuous Integration
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+  checks:
+    name: Format, lint, and tests
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v swift-format >/dev/null 2>&1; then
+            brew install swift-format
+          fi
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            brew install swiftlint
+          fi
+
+      - name: Check formatting
+        run: make format-check
+
+      - name: Lint
+        run: make lint
+
+      - name: Run tests
+        run: swift test
