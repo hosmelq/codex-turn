@@ -319,3 +319,59 @@ final class CodexHistoryScannerTests: XCTestCase {
     }
 
 }
+
+final class CodexHistoryScannerSessionIdFallbackTests: XCTestCase {
+    func testScannerUsesFallbackSessionIdForResponseItemsWithoutSessionId() throws {
+        let sessionsDirectory = try TestSupport.makeTemporaryDirectory(prefix: "sessions")
+        defer { try? FileManager.default.removeItem(at: sessionsDirectory) }
+
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let sessionId = "7e95fdcb-2f7a-4d66-85dd-dc15211a973a"
+        let fileURL = sessionsDirectory.appendingPathComponent(
+            "2026-02-25T10-00-00-\(sessionId).jsonl"
+        )
+
+        try TestSupport.writeJSONLines(
+            [
+                [
+                    "type": "session_meta",
+                    "timestamp": TestSupport.isoString(now.addingTimeInterval(-900)),
+                    "payload": [
+                        "cwd": "/Users/me/work/app",
+                        "id": sessionId,
+                    ],
+                ],
+                [
+                    "type": "response_item",
+                    "timestamp": TestSupport.isoString(now.addingTimeInterval(-600)),
+                    "payload": [
+                        "id": "msg_001",
+                        "role": "user",
+                        "content": [
+                            [
+                                "text": "Please add a test case",
+                                "type": "input_text",
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            to: fileURL
+        )
+
+        let scanner = CodexHistoryScanner(initialFileCursors: [:], sessionsDirectory: sessionsDirectory)
+        let result = scanner.scanRecentSessions(
+            by: now.addingTimeInterval(-3600),
+            useRepoRoot: false,
+            ignoredPrefixes: []
+        )
+
+        XCTAssertEqual(result.totalSessions, 1)
+        let project = try XCTUnwrap(result.projectGroups["/Users/me/work/app"])
+        XCTAssertEqual(project.sessions.count, 1)
+        let session = try XCTUnwrap(project.latestSession)
+        XCTAssertEqual(session.sessionId, sessionId)
+        XCTAssertNotNil(session.latestUserEvent)
+        XCTAssertEqual(session.latestUserSummary, "Please add a test case")
+    }
+}

@@ -109,11 +109,19 @@ enum CodexHistoryScannerSupport {
             timestamp = parseDate(isoTimestamp)
         }
 
-        let sessionId =
-            (dict["session_id"] as? String)
-            ?? (payload["session_id"] as? String)
-            ?? (payload["id"] as? String)
-            ?? fallbackSessionId
+        let sessionId: String
+        if type == "session_meta" {
+            sessionId =
+                (dict["session_id"] as? String)
+                ?? (payload["session_id"] as? String)
+                ?? (payload["id"] as? String)
+                ?? fallbackSessionId
+        } else {
+            sessionId =
+                (dict["session_id"] as? String)
+                ?? (payload["session_id"] as? String)
+                ?? fallbackSessionId
+        }
 
         let baseInstructionsText =
             (payload["base_instructions"] as? [String: Any])?["text"] as? String
