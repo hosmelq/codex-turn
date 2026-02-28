@@ -214,7 +214,7 @@ jobs:
           printf '%s' "${SPARKLE_PRIVATE_ED_KEY}" | "${{ steps.generate-appcast-tool.outputs.path }}" \
             --ed-key-file - \
             --maximum-versions 0 \
-            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}" \
+            --download-url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}/" \
             -o "${{ steps.appcast.outputs.workspace }}/appcast.xml" \
             "${{ steps.appcast.outputs.workspace }}"
 
