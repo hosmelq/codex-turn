@@ -3,6 +3,14 @@
     <channel>
         <title>CodexTurn</title>
         <item>
+            <title>1.0.2</title>
+            <pubDate>Wed, 04 Mar 2026 20:17:00 +0000</pubDate>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hosmelq/codex-turn/releases/download/v1.0.2/CodexTurn-1.0.2.zip" length="4188277" type="application/octet-stream" sparkle:edSignature="c8pbZDi8D4X9YNtjTAgu5Dsg+9GDMaOq9W2DnMVt7UrxnN4dUKEEwAClvQYrvs657DoCAIxM7qIH3O5u2pyDCw=="/>
+        </item>
+        <item>
             <title>1.0.1</title>
             <pubDate>Sat, 28 Feb 2026 00:54:17 +0000</pubDate>
             <sparkle:version>11</sparkle:version>
