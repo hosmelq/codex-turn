@@ -18,7 +18,7 @@ final class CodexHistoryScannerWorkspaceRootTests: XCTestCase {
                     "timestamp": TestSupport.isoString(now.addingTimeInterval(-600)),
                     "payload": [
                         "base_instructions": [
-                            "text": "Workspace root: `/Users/me/Code/pickuphub.net`",
+                            "text": "Workspace root: `/Users/me/Code/example-project`",
                         ],
                         "cwd": "/",
                         "id": "019c9641-6eb7-7652-9f6d-45d514962eec",
@@ -48,7 +48,7 @@ final class CodexHistoryScannerWorkspaceRootTests: XCTestCase {
             ignoredPrefixes: []
         )
 
-        let project = try XCTUnwrap(result.projectGroups["/Users/me/Code/pickuphub.net"])
+        let project = try XCTUnwrap(result.projectGroups["/Users/me/Code/example-project"])
         let session = try XCTUnwrap(project.latestSession)
         XCTAssertNil(session.latestUserSummary)
         XCTAssertNotNil(session.latestAssistantEvent)

@@ -190,7 +190,7 @@ final class StatusBarController: NSObject, ObservableObject {
 
         let checkForUpdates = NSMenuItem(
             title: "Check for Updates…",
-            action: #selector(checkForUpdates),
+            action: #selector(checkForUpdates(_:)),
             keyEquivalent: ""
         )
         checkForUpdates.target = self
@@ -234,8 +234,13 @@ final class StatusBarController: NSObject, ObservableObject {
         }
     }
 
-    @objc private func checkForUpdates() {
-        _ = updateManager.checkForUpdates()
+    @objc private func checkForUpdates(_ sender: Any?) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            _ = self.updateManager.checkForUpdates(sender: sender)
+        }
     }
 
     @objc private func showSettings() {

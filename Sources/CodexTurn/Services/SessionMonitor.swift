@@ -281,46 +281,6 @@ extension SessionMonitor {
         project.sessions.sorted { $0.latestEvent > $1.latestEvent }
     }
 
-    public func sessionTitle(_ session: SessionSnapshot) -> String {
-        if let summary = latestSummary(for: session) {
-            return summary
-        }
-
-        let tail = session.sessionId.count > 8 ? String(session.sessionId.suffix(8)) : session.sessionId
-        return "Thread \(tail)"
-    }
-
-    public func projectLastActiveText(_ project: ProjectGroup) -> String {
-        project.latestSession?.latestEvent.timeAgoDisplay() ?? "unknown"
-    }
-
-    private func latestSummary(for session: SessionSnapshot) -> String? {
-        let userSummary = normalizedSummary(session.latestUserSummary)
-        let assistantSummary = normalizedSummary(session.latestAssistantSummary)
-
-        switch (session.latestUserEvent, session.latestAssistantEvent) {
-        case (.some, .none):
-            return userSummary ?? assistantSummary
-        case (.none, .some):
-            return assistantSummary ?? userSummary
-        case (.some(let userDate), .some(let assistantDate)):
-            if assistantDate >= userDate {
-                return assistantSummary ?? userSummary
-            }
-            return userSummary ?? assistantSummary
-        case (.none, .none):
-            return userSummary ?? assistantSummary
-        }
-    }
-
-    private func normalizedSummary(_ summary: String?) -> String? {
-        guard let summary else {
-            return nil
-        }
-        let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
     private static func normalizedCodexHomePath(_ value: String?) -> String? {
         guard let value else {
             return nil

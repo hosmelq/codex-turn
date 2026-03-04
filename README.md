@@ -19,7 +19,7 @@ Reference: [It takes 23 mins to recover after an interruption](https://addyo.sub
 ## What CodexTurn does
 
 - Scans recent Codex sessions under your local Codex home.
-- Combines Codex Desktop App worktrees from the same repo into one project (default); disable for per-folder view.
+- Combines Git worktrees from the same repository into one project (default); disable for per-folder view.
 - Shows projects and threads in the menu bar with clear status labels.
 - Sends local macOS reminders when your reply is overdue.
 - Runs locally against your session files.

@@ -6,6 +6,7 @@ struct JsonEnvelope {
     let sessionId: String?
     let cwd: String?
     let gitBranch: String?
+    let gitRepositoryURL: String?
     let originator: String?
     let role: String?
     let messageText: String?
@@ -132,7 +133,12 @@ enum CodexHistoryScannerSupport {
         {
             cwd = extractedWorkspaceRoot
         }
-        let gitBranch = (payload["git"] as? [String: Any])?["branch"] as? String
+        let gitPayload = payload["git"] as? [String: Any]
+        let gitBranch = gitPayload?["branch"] as? String
+        let gitRepositoryURL =
+            (gitPayload?["repository_url"] as? String)
+            ?? (gitPayload?["repositoryUrl"] as? String)
+            ?? (gitPayload?["repository"] as? String)
         let originator = payload["originator"] as? String
         let role = (payload["role"] as? String) ?? (payloadItem?["role"] as? String)
         let source = payload["source"] as? String
@@ -154,6 +160,7 @@ enum CodexHistoryScannerSupport {
             sessionId: sessionId,
             cwd: cwd,
             gitBranch: gitBranch,
+            gitRepositoryURL: gitRepositoryURL,
             originator: originator,
             role: role,
             messageText: messageText,

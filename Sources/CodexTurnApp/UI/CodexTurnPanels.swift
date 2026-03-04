@@ -96,7 +96,8 @@ struct SettingsView: View {
                 Divider()
                 toggleRow(
                     title: "Group worktrees by repository",
-                    subtitle: "ON combines Codex worktrees from the same repo. OFF shows each worktree separately.",
+                    subtitle:
+                        "ON combines worktrees from the same Git repository. OFF shows each worktree separately.",
                     isOn: $monitor.useRepoRoot
                 )
                 Divider()

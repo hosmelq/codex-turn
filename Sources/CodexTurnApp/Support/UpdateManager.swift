@@ -20,12 +20,12 @@ final class UpdateManager {
     }
 
     @discardableResult
-    func checkForUpdates() -> Bool {
+    func checkForUpdates(sender: Any? = nil) -> Bool {
         guard isSparkleConfigured else {
             return false
         }
 
-        updaterController.checkForUpdates(nil)
+        updaterController.checkForUpdates(sender)
         return true
     }
 

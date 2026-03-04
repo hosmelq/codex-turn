@@ -60,7 +60,7 @@ final class CodexHistoryScannerRefreshTests: XCTestCase {
                         "git": [
                             "branch": "feature/thread-menu",
                         ],
-                        "originator": "Codex Desktop",
+                        "originator": "Desktop Client",
                         "source": "vscode",
                     ],
                 ],
@@ -77,7 +77,7 @@ final class CodexHistoryScannerRefreshTests: XCTestCase {
 
         let session = try XCTUnwrap(result.projectGroups["/Users/me/work/project"]?.latestSession)
         XCTAssertEqual(session.gitBranch, "feature/thread-menu")
-        XCTAssertEqual(session.originator, "Codex Desktop")
+        XCTAssertEqual(session.originator, "Desktop Client")
         XCTAssertEqual(session.source, "vscode")
     }
 

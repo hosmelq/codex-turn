@@ -103,6 +103,7 @@ extension CodexHistoryScanner {
                 cwd: cwd,
                 firstSeen: eventTime,
                 gitBranch: envelope.gitBranch,
+                gitRepositoryURL: envelope.gitRepositoryURL,
                 latestEvent: eventTime,
                 latestUserEvent: nil,
                 latestAssistantEvent: nil,
@@ -118,6 +119,9 @@ extension CodexHistoryScanner {
         updated.firstSeen = min(existing.firstSeen, eventTime)
         if let gitBranch = envelope.gitBranch, !gitBranch.isEmpty {
             updated.gitBranch = gitBranch
+        }
+        if let gitRepositoryURL = envelope.gitRepositoryURL, !gitRepositoryURL.isEmpty {
+            updated.gitRepositoryURL = gitRepositoryURL
         }
         if let originator = envelope.originator, !originator.isEmpty {
             updated.originator = originator
@@ -159,6 +163,7 @@ extension CodexHistoryScanner {
                 cwd: resolvedCwd,
                 firstSeen: eventTime,
                 gitBranch: envelope.gitBranch,
+                gitRepositoryURL: envelope.gitRepositoryURL,
                 latestEvent: eventTime,
                 latestUserEvent: nil,
                 latestAssistantEvent: nil,
@@ -182,6 +187,9 @@ extension CodexHistoryScanner {
         }
         if let gitBranch = envelope.gitBranch, !gitBranch.isEmpty {
             updated.gitBranch = gitBranch
+        }
+        if let gitRepositoryURL = envelope.gitRepositoryURL, !gitRepositoryURL.isEmpty {
+            updated.gitRepositoryURL = gitRepositoryURL
         }
         if let originator = envelope.originator, !originator.isEmpty {
             updated.originator = originator

@@ -61,6 +61,7 @@ public struct SessionSnapshot: Codable, Equatable {
     public var cwd: String
     public var firstSeen: Date
     public var gitBranch: String?
+    public var gitRepositoryURL: String?
     public var latestEvent: Date
     public var latestUserEvent: Date?
     public var latestAssistantEvent: Date?
@@ -75,6 +76,7 @@ public struct SessionSnapshot: Codable, Equatable {
         cwd: String,
         firstSeen: Date,
         gitBranch: String? = nil,
+        gitRepositoryURL: String? = nil,
         latestEvent: Date,
         latestUserEvent: Date?,
         latestAssistantEvent: Date?,
@@ -88,6 +90,7 @@ public struct SessionSnapshot: Codable, Equatable {
         self.cwd = cwd
         self.firstSeen = firstSeen
         self.gitBranch = gitBranch
+        self.gitRepositoryURL = gitRepositoryURL
         self.latestEvent = latestEvent
         self.latestUserEvent = latestUserEvent
         self.latestAssistantEvent = latestAssistantEvent

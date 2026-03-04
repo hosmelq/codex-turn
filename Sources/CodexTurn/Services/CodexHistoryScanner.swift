@@ -78,16 +78,29 @@ final class CodexHistoryScanner: CodexHistoryScanning {
         let groupedByProject = Dictionary(grouping: recentSessions) { snapshot in
             ProjectResolver.normalizeProjectPath(from: snapshot.cwd, useRepoRoot: useRepoRoot)
         }
-        let allProjectPaths = Array(groupedByProject.keys)
-
-        return groupedByProject.reduce(into: [String: ProjectGroup]()) { result, entry in
-            let projectPath = entry.key
-            let sessionsSorted = entry.value.sorted { lhs, rhs in
+        let sessionsSortedByProject = groupedByProject.mapValues { sessions in
+            sessions.sorted { lhs, rhs in
                 if lhs.latestEvent == rhs.latestEvent {
                     return lhs.sessionId < rhs.sessionId
                 }
                 return lhs.latestEvent > rhs.latestEvent
             }
+        }
+        let allProjectPaths = Array(sessionsSortedByProject.keys)
+        let namingHints = sessionsSortedByProject.reduce(into: [String: String]()) { result, entry in
+            guard
+                let repositoryName = entry.value
+                    .compactMap({ ProjectResolver.repositoryName(from: $0.gitRepositoryURL) })
+                    .first
+            else {
+                return
+            }
+            result[entry.key] = repositoryName
+        }
+
+        return sessionsSortedByProject.reduce(into: [String: ProjectGroup]()) { result, entry in
+            let projectPath = entry.key
+            let sessionsSorted = entry.value
 
             guard !sessionsSorted.isEmpty else {
                 return
@@ -97,7 +110,8 @@ final class CodexHistoryScanner: CodexHistoryScanning {
                 id: projectPath,
                 displayName: ProjectResolver.displayName(
                     for: projectPath,
-                    allProjectPaths: allProjectPaths
+                    allProjectPaths: allProjectPaths,
+                    namingHints: namingHints
                 ),
                 projectPath: projectPath,
                 sessions: sessionsSorted

@@ -143,6 +143,25 @@ final class DateAndModelTests: XCTestCase {
             useRepoRoot: true
         )
         XCTAssertEqual(normalizedWorktree, mainRoot.path)
+
+        XCTAssertEqual(
+            ProjectResolver.repositoryName(from: "git@github.com:example-org/example-repo.git"),
+            "example-repo"
+        )
+        XCTAssertEqual(
+            ProjectResolver.repositoryName(from: "git@example.com:example-repo.git"),
+            "example-repo"
+        )
+        XCTAssertEqual(
+            ProjectResolver.repositoryName(from: "https://github.com/example-org/example-repo.git"),
+            "example-repo"
+        )
+        XCTAssertEqual(
+            ProjectResolver.repositoryName(
+                from: "ssh://git@github.com/example-org/example-repo.git"
+            ),
+            "example-repo"
+        )
     }
 
     func testExtractEnvironmentCwdRejectsCodeSnippetsAndParsesPaths() {

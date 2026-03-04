@@ -12,11 +12,17 @@ struct ProjectResolver {
         return findRepoRoot(for: url)
     }
 
-    static func displayName(for projectPath: String, allProjectPaths: [String] = []) -> String {
+    static func displayName(
+        for projectPath: String,
+        allProjectPaths: [String] = [],
+        namingHints: [String: String] = [:]
+    ) -> String {
         let path = URL(fileURLWithPath: projectPath)
-        let base = path.lastPathComponent.isEmpty ? projectPath : path.lastPathComponent
+        let base = displayBase(for: projectPath, namingHints: namingHints)
 
-        let sameBasePaths = allProjectPaths.filter { URL(fileURLWithPath: $0).lastPathComponent == base }
+        let sameBasePaths = allProjectPaths.filter {
+            displayBase(for: $0, namingHints: namingHints) == base
+        }
         if sameBasePaths.count <= 1 {
             return base
         }
@@ -47,6 +53,73 @@ struct ProjectResolver {
             return base
         }
         return "\(base) (\(parent))"
+    }
+
+    static func repositoryName(from remoteURL: String?) -> String? {
+        guard
+            let rawRemoteURL = remoteURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawRemoteURL.isEmpty
+        else {
+            return nil
+        }
+
+        if let scpPath = scpRemotePath(from: rawRemoteURL) {
+            return repositoryName(fromPath: "/\(scpPath)")
+        }
+
+        if let remoteAsURL = URL(string: rawRemoteURL),
+            let candidate = repositoryName(fromPath: remoteAsURL.path)
+        {
+            return candidate
+        }
+
+        return repositoryName(fromPath: rawRemoteURL)
+    }
+
+    private static func displayBase(for projectPath: String, namingHints: [String: String]) -> String {
+        if let namingHint = namingHints[projectPath]?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !namingHint.isEmpty
+        {
+            return namingHint
+        }
+
+        let path = URL(fileURLWithPath: projectPath)
+        return path.lastPathComponent.isEmpty ? projectPath : path.lastPathComponent
+    }
+
+    private static func repositoryName(fromPath path: String) -> String? {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let withoutFragment = String(trimmed.split(separator: "#", maxSplits: 1).first ?? "")
+        let withoutQuery = String(withoutFragment.split(separator: "?", maxSplits: 1).first ?? "")
+        let normalized = withoutQuery.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let lastComponent = normalized.split(separator: "/").last else {
+            return nil
+        }
+
+        var name = String(lastComponent)
+        if name.hasSuffix(".git") {
+            name.removeLast(4)
+        }
+
+        return name.isEmpty ? nil : name
+    }
+
+    private static func scpRemotePath(from remoteURL: String) -> String? {
+        guard !remoteURL.contains("://"),
+            let atIndex = remoteURL.firstIndex(of: "@"),
+            let separatorIndex = remoteURL[atIndex...].firstIndex(of: ":"),
+            separatorIndex < remoteURL.index(before: remoteURL.endIndex)
+        else {
+            return nil
+        }
+
+        let pathPart = remoteURL[remoteURL.index(after: separatorIndex)...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return pathPart.isEmpty ? nil : pathPart
     }
 
     private static func findRepoRoot(for url: URL) -> String {
@@ -81,10 +154,10 @@ struct ProjectResolver {
     }
 
     private static func disambiguationLabel(for projectURL: URL) -> String? {
-        detectCodexWorktreeID(for: projectURL) ?? detectGitWorktreeName(for: projectURL)
+        detectWorktreeIDFromPathPattern(for: projectURL) ?? detectGitWorktreeName(for: projectURL)
     }
 
-    private static func detectCodexWorktreeID(for projectURL: URL) -> String? {
+    private static func detectWorktreeIDFromPathPattern(for projectURL: URL) -> String? {
         let components = projectURL.standardizedFileURL.pathComponents
         guard let worktreesIndex = components.lastIndex(of: "worktrees"),
             worktreesIndex + 2 < components.count
